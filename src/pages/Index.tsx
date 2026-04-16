@@ -72,45 +72,28 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-background">
       {selectedMatch ? (
-        <div className="flex flex-col min-h-screen">
-          {/* Player Header */}
-          <div className="flex items-center gap-3 p-4 border-b border-border">
-            <button
-              onClick={handleBack}
-              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="text-sm font-medium">Back to matches</span>
-            </button>
-            <div className="ml-auto">
-              <span className="text-sm text-muted-foreground">{selectedMatch.name}</span>
+        <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
+          {streamLoading ? (
+            <div className="flex flex-col items-center gap-3 text-muted-foreground">
+              <Loader2 className="w-10 h-10 animate-spin text-primary" />
+              <span>Loading stream...</span>
             </div>
-          </div>
-
-          {/* Player Area */}
-          <div className="flex-1 flex items-center justify-center p-4">
-            {streamLoading ? (
-              <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                <Loader2 className="w-10 h-10 animate-spin text-primary" />
-                <span>Loading stream...</span>
-              </div>
-            ) : streamError ? (
-              <div className="flex flex-col items-center gap-3 text-center">
-                <AlertCircle className="w-10 h-10 text-primary" />
-                <p className="text-muted-foreground">{streamError}</p>
-                <button
-                  onClick={handleBack}
-                  className="mt-2 text-sm text-primary hover:underline"
-                >
-                  Go back
-                </button>
-              </div>
-            ) : streamUrl ? (
-              <div className="w-full max-w-5xl">
-                <ClapprProxyPlayer streamUrl={streamUrl} />
-              </div>
-            ) : null}
-          </div>
+          ) : streamError ? (
+            <div className="flex flex-col items-center gap-3 text-center">
+              <AlertCircle className="w-10 h-10 text-primary" />
+              <p className="text-muted-foreground">{streamError}</p>
+              <button
+                onClick={handleBack}
+                className="mt-2 text-sm text-primary hover:underline"
+              >
+                Go back
+              </button>
+            </div>
+          ) : streamUrl ? (
+            <div className="w-full h-full">
+              <ClapprProxyPlayer streamUrl={streamUrl} />
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="flex flex-col md:flex-row min-h-screen">
