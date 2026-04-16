@@ -21,21 +21,28 @@ export default function Match() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // First try location.state (from internal navigation)
+    // 1. Try location.state (from internal navigation — fastest)
     const stateMatchUrl = (location.state as any)?.matchUrl;
     if (stateMatchUrl) {
       fetchStream(stateMatchUrl);
       return;
     }
 
-    // Otherwise, look up match by slug from the matches API
+    // 2. Try ?src= query param (for iframe embed — skips matches lookup)
+    const params = new URLSearchParams(window.location.search);
+    const srcUrl = params.get('src');
+    if (srcUrl) {
+      fetchStream(srcUrl);
+      return;
+    }
+
+    // 3. Fallback: look up match by slug from the matches API
     if (!slug) { setError('Match not found.'); return; }
 
     fetch(`${SUPABASE_URL}/functions/v1/matches`)
       .then(res => res.json())
       .then(data => {
         const matches = data.matches || [];
-        // Generate slugs same way as Index page
         const slugCount: Record<string, number> = {};
         for (const match of matches) {
           let s = toSlug(match.name);
