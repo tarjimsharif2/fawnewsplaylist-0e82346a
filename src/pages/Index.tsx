@@ -37,9 +37,19 @@ export default function Index() {
     }
   };
 
+  const toSlug = (name: string) =>
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .substring(0, 60);
+
   const handleMatchClick = (match: Match) => {
-    const slug = btoa(encodeURIComponent(match.url));
-    navigate(`/match/${slug}`);
+    const slug = toSlug(match.name);
+    const u = btoa(encodeURIComponent(match.url));
+    navigate(`/match/${slug}?u=${u}`);
   };
 
   return (
