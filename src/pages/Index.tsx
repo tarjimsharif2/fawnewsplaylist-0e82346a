@@ -46,10 +46,27 @@ export default function Index() {
       .replace(/-+/g, '-')
       .substring(0, 60);
 
+  const generateUniqueSlugs = (matches: Match[]) => {
+    const slugCount: Record<string, number> = {};
+    const slugMap: Record<string, string> = {};
+    matches.forEach((match) => {
+      let slug = toSlug(match.name);
+      if (slugCount[slug] !== undefined) {
+        slugCount[slug]++;
+        slug = `${slug}-${slugCount[slug]}`;
+      } else {
+        slugCount[slug] = 0;
+      }
+      slugMap[match.id] = slug;
+    });
+    return slugMap;
+  };
+
+  const slugMap = generateUniqueSlugs(matches);
+
   const handleMatchClick = (match: Match) => {
-    const slug = toSlug(match.name);
-    const u = btoa(encodeURIComponent(match.url));
-    navigate(`/match/${slug}?u=${u}`);
+    const slug = slugMap[match.id];
+    navigate(`/match/${slug}`, { state: { matchUrl: match.url } });
   };
 
   return (

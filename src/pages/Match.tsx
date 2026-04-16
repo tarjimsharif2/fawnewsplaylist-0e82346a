@@ -1,19 +1,19 @@
 import { useState, useEffect } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { ClapprProxyPlayer } from '@/components/ClapprProxyPlayer';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 export default function Match() {
   const { slug } = useParams<{ slug: string }>();
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const u = searchParams.get('u');
-    if (!u) { setError('No stream URL provided.'); return; }
-    const matchUrl = decodeURIComponent(atob(u));
+    const matchUrl = (location.state as any)?.matchUrl;
+    if (!matchUrl) { navigate('/'); return; }
     
     fetch(`${SUPABASE_URL}/functions/v1/stream?url=${encodeURIComponent(matchUrl)}`)
       .then(res => {
