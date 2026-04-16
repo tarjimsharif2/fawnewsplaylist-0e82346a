@@ -1,20 +1,61 @@
 import { useState, useEffect } from 'react';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import { ClapprProxyPlayer } from '@/components/ClapprProxyPlayer';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
+function toSlug(name: string) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .substring(0, 60);
+}
+
 export default function Match() {
   const { slug } = useParams<{ slug: string }>();
   const location = useLocation();
-  const navigate = useNavigate();
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const matchUrl = (location.state as any)?.matchUrl;
-    if (!matchUrl) { navigate('/'); return; }
-    
+    // First try location.state (from internal navigation)
+    const stateMatchUrl = (location.state as any)?.matchUrl;
+    if (stateMatchUrl) {
+      fetchStream(stateMatchUrl);
+      return;
+    }
+
+    // Otherwise, look up match by slug from the matches API
+    if (!slug) { setError('Match not found.'); return; }
+
+    fetch(`${SUPABASE_URL}/functions/v1/matches`)
+      .then(res => res.json())
+      .then(data => {
+        const matches = data.matches || [];
+        // Generate slugs same way as Index page
+        const slugCount: Record<string, number> = {};
+        for (const match of matches) {
+          let s = toSlug(match.name);
+          if (slugCount[s] !== undefined) {
+            slugCount[s]++;
+            s = `${s}-${slugCount[s]}`;
+          } else {
+            slugCount[s] = 0;
+          }
+          if (s === slug) {
+            fetchStream(match.url);
+            return;
+          }
+        }
+        setError('Match not found.');
+      })
+      .catch(() => setError('Failed to load match.'));
+  }, [slug]);
+
+  const fetchStream = (matchUrl: string) => {
     fetch(`${SUPABASE_URL}/functions/v1/stream?url=${encodeURIComponent(matchUrl)}`)
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch stream');
@@ -25,7 +66,7 @@ export default function Match() {
         else setError('No stream found.');
       })
       .catch(err => setError(err.message));
-  }, [slug]);
+  };
 
   // Auto landscape on fullscreen for mobile
   useEffect(() => {
@@ -62,7 +103,7 @@ export default function Match() {
   }
 
   if (!streamUrl) {
-    return null; // Clappr handles its own loading
+    return null;
   }
 
   return (
