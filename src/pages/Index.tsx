@@ -91,7 +91,7 @@ export default function Index() {
             {/* Mobile Header */}
             <div className="md:hidden flex items-center gap-2 mb-6">
               <Tv className="w-6 h-6 text-primary" />
-              <span className="text-lg font-bold tracking-tight"ePlayHD</span>
+              <span className="text-lg font-bold tracking-tight">ePlayHD</span>
             </div>
 
             <div className="flex items-center justify-between mb-6">
