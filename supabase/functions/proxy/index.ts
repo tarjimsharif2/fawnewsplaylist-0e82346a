@@ -6,6 +6,7 @@ const corsHeaders = {
 const ALLOWED_REFERERS = [
   "eplayhd.com",
   "cricfoots.com",
+  "photocard.fun",
   "id-preview--d7474244-904c-47a7-bfbf-66d59ba09980.lovable.app",
   "lovable.app",
   "lovableproject.com",
