@@ -76,7 +76,7 @@ export default function Index() {
           <aside className="hidden md:flex flex-col w-64 border-r border-border p-6">
             <div className="flex items-center gap-2 mb-8">
               <Tv className="w-6 h-6 text-primary" />
-              <span className="text-lg font-bold tracking-tight">FawaNews</span>
+              <span className="text-lg font-bold tracking-tight">ePlayHD</span>
             </div>
             <nav className="space-y-1">
               <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-card text-foreground">
@@ -91,7 +91,7 @@ export default function Index() {
             {/* Mobile Header */}
             <div className="md:hidden flex items-center gap-2 mb-6">
               <Tv className="w-6 h-6 text-primary" />
-              <span className="text-lg font-bold tracking-tight">FawaNews</span>
+              <span className="text-lg font-bold tracking-tight"ePlayHD</span>
             </div>
 
             <div className="flex items-center justify-between mb-6">
