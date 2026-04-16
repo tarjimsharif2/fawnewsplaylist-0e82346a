@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ClapprProxyPlayer } from '@/components/ClapprProxyPlayer';
-import { Play, Tv, ArrowLeft, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Play, Tv, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -16,11 +16,7 @@ export default function Index() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
-  const [streamUrl, setStreamUrl] = useState<string | null>(null);
-  const [streamLoading, setStreamLoading] = useState(false);
-  const [streamError, setStreamError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchMatches();
@@ -41,62 +37,14 @@ export default function Index() {
     }
   };
 
-  const handleMatchClick = async (match: Match) => {
-    setSelectedMatch(match);
-    setStreamUrl(null);
-    setStreamError(null);
-    setStreamLoading(true);
-
-    try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/stream?url=${encodeURIComponent(match.url)}`);
-      if (!res.ok) throw new Error('Failed to fetch stream URL');
-      const data = await res.json();
-      if (data.streamUrl) {
-        setStreamUrl(data.streamUrl);
-      } else {
-        setStreamError('No stream found for this match.');
-      }
-    } catch (err: any) {
-      setStreamError(err.message || 'An error occurred while fetching the stream.');
-    } finally {
-      setStreamLoading(false);
-    }
-  };
-
-  const handleBack = () => {
-    setSelectedMatch(null);
-    setStreamUrl(null);
-    setStreamError(null);
+  const handleMatchClick = (match: Match) => {
+    const slug = btoa(encodeURIComponent(match.url));
+    navigate(`/match/${slug}`);
   };
 
   return (
     <div className="min-h-screen bg-background">
-      {selectedMatch ? (
-        <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
-          {streamLoading ? (
-            <div className="flex flex-col items-center gap-3 text-muted-foreground">
-              <Loader2 className="w-10 h-10 animate-spin text-primary" />
-              <span>Loading stream...</span>
-            </div>
-          ) : streamError ? (
-            <div className="flex flex-col items-center gap-3 text-center">
-              <AlertCircle className="w-10 h-10 text-primary" />
-              <p className="text-muted-foreground">{streamError}</p>
-              <button
-                onClick={handleBack}
-                className="mt-2 text-sm text-primary hover:underline"
-              >
-                Go back
-              </button>
-            </div>
-          ) : streamUrl ? (
-            <div className="w-full h-full">
-              <ClapprProxyPlayer streamUrl={streamUrl} />
-            </div>
-          ) : null}
-        </div>
-      ) : (
-        <div className="flex flex-col md:flex-row min-h-screen">
+      <div className="flex flex-col md:flex-row min-h-screen">
           {/* Sidebar */}
           <aside className="hidden md:flex flex-col w-64 border-r border-border p-6">
             <div className="flex items-center gap-2 mb-8">
@@ -213,8 +161,7 @@ export default function Index() {
               </div>
             )}
           </main>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
