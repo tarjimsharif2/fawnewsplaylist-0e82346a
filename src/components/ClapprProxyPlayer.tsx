@@ -241,7 +241,7 @@ export const ClapprProxyPlayer = ({
   const containerId = useRef(`cp-${Math.random().toString(36).slice(2, 8)}`).current;
 
   return (
-    <div className="relative w-full bg-black" style={{ aspectRatio: '16/9' }}>
+    <div className="relative w-full h-full bg-black">
       <div
         ref={(el) => {
           playerContainerRef.current = el;
