@@ -6,12 +6,14 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 export default function Match() {
   const { slug } = useParams<{ slug: string }>();
+  const [searchParams] = useSearchParams();
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!slug) return;
-    const matchUrl = decodeURIComponent(atob(slug));
+    const u = searchParams.get('u');
+    if (!u) { setError('No stream URL provided.'); return; }
+    const matchUrl = decodeURIComponent(atob(u));
     
     fetch(`${SUPABASE_URL}/functions/v1/stream?url=${encodeURIComponent(matchUrl)}`)
       .then(res => {
