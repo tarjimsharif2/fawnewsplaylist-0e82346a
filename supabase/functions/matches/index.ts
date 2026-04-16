@@ -3,12 +3,53 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const ALLOWED_REFERERS = [
+  "eplayhd.com",
+  "cricfoots.com",
+  "id-preview--d7474244-904c-47a7-bfbf-66d59ba09980.lovable.app",
+  "lovable.app",
+  "lovableproject.com",
+  "localhost",
+];
+
+function checkReferer(req: Request): Response | null {
+  if (req.method === "OPTIONS") return null;
+  const referer = req.headers.get("referer") || req.headers.get("origin") || "";
+  if (!referer) {
+    return new Response(
+      JSON.stringify({ error: "Access denied. No referer." }),
+      { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+  try {
+    const host = new URL(referer).hostname;
+    const allowed = ALLOWED_REFERERS.some(
+      (d) => host === d || host.endsWith("." + d)
+    );
+    if (!allowed) {
+      return new Response(
+        JSON.stringify({ error: "Access denied. Unauthorized domain." }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+  } catch {
+    return new Response(
+      JSON.stringify({ error: "Access denied. Invalid referer." }),
+      { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+  return null;
+}
+
 const BASE_URL = "http://www.fawanews.sc/";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  const blocked = checkReferer(req);
+  if (blocked) return blocked;
 
   try {
     const response = await fetch(BASE_URL, {
@@ -27,7 +68,6 @@ Deno.serve(async (req) => {
       image?: string;
     }> = [];
 
-    // Parse user-item links with regex since cheerio isn't available in Deno
     const linkRegex =
       /<a[^>]*href=["']([^"']+\.html)["'][^>]*>[\s\S]*?<\/a>/gi;
     let match;
@@ -43,7 +83,6 @@ Deno.serve(async (req) => {
       )
         continue;
 
-      // Extract name from user-item__name
       const nameMatch = block.match(
         /class=["']user-item__name["'][^>]*>([^<]+)/
       );
@@ -52,11 +91,9 @@ Deno.serve(async (req) => {
       const name = nameMatch[1].trim();
       if (matches.find((m) => m.url === href)) continue;
 
-      // Extract time from user-item__playing
       const timeMatch = block.match(
         /class=["']user-item__playing["'][^>]*>([^<]+)/
       );
-      // Extract image
       const imgMatch = block.match(
         /class=["']user-item__avatar["'][^>]*>[\s\S]*?<img[^>]*src=["']([^"']+)["']/
       );
