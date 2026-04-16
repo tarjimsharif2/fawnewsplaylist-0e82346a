@@ -3,12 +3,53 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const ALLOWED_REFERERS = [
+  "eplayhd.com",
+  "cricfoots.com",
+  "id-preview--d7474244-904c-47a7-bfbf-66d59ba09980.lovable.app",
+  "lovable.app",
+  "lovableproject.com",
+  "localhost",
+];
+
+function checkReferer(req: Request): Response | null {
+  if (req.method === "OPTIONS") return null;
+  const referer = req.headers.get("referer") || req.headers.get("origin") || "";
+  if (!referer) {
+    return new Response(
+      JSON.stringify({ error: "Access denied. No referer." }),
+      { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+  try {
+    const host = new URL(referer).hostname;
+    const allowed = ALLOWED_REFERERS.some(
+      (d) => host === d || host.endsWith("." + d)
+    );
+    if (!allowed) {
+      return new Response(
+        JSON.stringify({ error: "Access denied. Unauthorized domain." }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+  } catch {
+    return new Response(
+      JSON.stringify({ error: "Access denied. Invalid referer." }),
+      { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+  return null;
+}
+
 const BASE_URL = "http://www.fawanews.sc/";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  const blocked = checkReferer(req);
+  if (blocked) return blocked;
 
   try {
     const urlObj = new URL(req.url);
@@ -32,7 +73,6 @@ Deno.serve(async (req) => {
 
     let streamUrl: string | null = null;
 
-    // Try var videos = [...] pattern
     const videosMatch = html.match(/var\s+videos\s*=\s*(\[[^\]]+\])/);
     if (videosMatch && videosMatch[1]) {
       try {
@@ -48,7 +88,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fallback: find any m3u8 URL
     if (!streamUrl) {
       const m3u8Match = html.match(/(http[^"'\s]+\.m3u8)/);
       if (m3u8Match && m3u8Match[1]) {
@@ -56,7 +95,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Rewrite to proxy through our proxy function
     if (streamUrl) {
       const projectId = Deno.env.get("SUPABASE_URL")?.match(
         /https:\/\/([^.]+)/

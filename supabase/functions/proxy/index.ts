@@ -3,10 +3,51 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const ALLOWED_REFERERS = [
+  "eplayhd.com",
+  "cricfoots.com",
+  "id-preview--d7474244-904c-47a7-bfbf-66d59ba09980.lovable.app",
+  "lovable.app",
+  "lovableproject.com",
+  "localhost",
+];
+
+function checkReferer(req: Request): Response | null {
+  if (req.method === "OPTIONS") return null;
+  const referer = req.headers.get("referer") || req.headers.get("origin") || "";
+  if (!referer) {
+    return new Response(
+      JSON.stringify({ error: "Access denied. No referer." }),
+      { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+  try {
+    const host = new URL(referer).hostname;
+    const allowed = ALLOWED_REFERERS.some(
+      (d) => host === d || host.endsWith("." + d)
+    );
+    if (!allowed) {
+      return new Response(
+        JSON.stringify({ error: "Access denied. Unauthorized domain." }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+  } catch {
+    return new Response(
+      JSON.stringify({ error: "Access denied. Invalid referer." }),
+      { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  const blocked = checkReferer(req);
+  if (blocked) return blocked;
 
   const urlObj = new URL(req.url);
   const url = urlObj.searchParams.get("url");
