@@ -103,7 +103,12 @@ export default function Match() {
   }
 
   if (!streamUrl) {
-    return null;
+    return (
+      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center text-white gap-4">
+        <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+        <p className="text-sm text-white/60">Please wait, stream is loading...</p>
+      </div>
+    );
   }
 
   return (
