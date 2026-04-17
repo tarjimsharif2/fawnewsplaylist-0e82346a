@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import { ClapprProxyPlayer } from '@/components/ClapprProxyPlayer';
+import { resolveStreamUrl } from '@/lib/stream';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -19,31 +20,51 @@ export default function Match() {
   const location = useLocation();
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const state = (location.state as { matchUrl?: string; streamUrl?: string } | null) ?? null;
+  const stateMatchUrl = state?.matchUrl;
+  const stateStreamUrl = state?.streamUrl;
 
   useEffect(() => {
-    // 1. Try location.state (from internal navigation — fastest)
-    const stateMatchUrl = (location.state as any)?.matchUrl;
-    if (stateMatchUrl) {
-      fetchStream(stateMatchUrl);
-      return;
-    }
+    let active = true;
 
-    // 2. Try ?src= query param (for iframe embed — skips matches lookup)
-    const params = new URLSearchParams(window.location.search);
-    const srcUrl = params.get('src');
-    if (srcUrl) {
-      fetchStream(srcUrl);
-      return;
-    }
+    const loadStream = async () => {
+      setError(null);
+      setStreamUrl(null);
 
-    // 3. Fallback: look up match by slug from the matches API
-    if (!slug) { setError('Match not found.'); return; }
+      try {
+        if (stateStreamUrl) {
+          if (active) setStreamUrl(stateStreamUrl);
+          return;
+        }
 
-    fetch(`${SUPABASE_URL}/functions/v1/matches`)
-      .then(res => res.json())
-      .then(data => {
+        if (stateMatchUrl) {
+          const resolvedStream = await resolveStreamUrl(stateMatchUrl);
+          if (active) setStreamUrl(resolvedStream);
+          return;
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        const srcUrl = params.get('src');
+        if (srcUrl) {
+          const resolvedStream = await resolveStreamUrl(srcUrl);
+          if (active) setStreamUrl(resolvedStream);
+          return;
+        }
+
+        if (!slug) {
+          throw new Error('Match not found.');
+        }
+
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/matches`);
+        if (!response.ok) {
+          throw new Error('Failed to load match.');
+        }
+
+        const data = await response.json();
         const matches = data.matches || [];
         const slugCount: Record<string, number> = {};
+        let matchedUrl: string | null = null;
+
         for (const match of matches) {
           let s = toSlug(match.name);
           if (slugCount[s] !== undefined) {
@@ -52,28 +73,32 @@ export default function Match() {
           } else {
             slugCount[s] = 0;
           }
+
           if (s === slug) {
-            fetchStream(match.url);
-            return;
+            matchedUrl = match.url;
+            break;
           }
         }
-        setError('Match not found.');
-      })
-      .catch(() => setError('Failed to load match.'));
-  }, [slug]);
 
-  const fetchStream = (matchUrl: string) => {
-    fetch(`${SUPABASE_URL}/functions/v1/stream?url=${encodeURIComponent(matchUrl)}`)
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch stream');
-        return res.json();
-      })
-      .then(data => {
-        if (data.streamUrl) setStreamUrl(data.streamUrl);
-        else setError('No stream found.');
-      })
-      .catch(err => setError(err.message));
-  };
+        if (!matchedUrl) {
+          throw new Error('Match not found.');
+        }
+
+        const resolvedStream = await resolveStreamUrl(matchedUrl);
+        if (active) setStreamUrl(resolvedStream);
+      } catch (err) {
+        if (active) {
+          setError(err instanceof Error ? err.message : 'Failed to load match.');
+        }
+      }
+    };
+
+    loadStream();
+
+    return () => {
+      active = false;
+    };
+  }, [slug, stateMatchUrl, stateStreamUrl, location.search]);
 
   // Auto landscape on fullscreen for mobile
   useEffect(() => {
