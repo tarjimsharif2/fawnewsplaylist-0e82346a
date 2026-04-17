@@ -70,13 +70,39 @@ export const ClapprProxyPlayer = ({
   }, []);
 
   useEffect(() => {
-    if (typeof window.Clappr !== 'undefined') { setScriptLoaded(true); return; }
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/@clappr/player@latest/dist/clappr.min.js';
-    script.async = true;
-    script.onload = () => setScriptLoaded(true);
-    script.onerror = () => { setError('Failed to load player script.'); setIsLoading(false); };
-    document.head.appendChild(script);
+    if (typeof window.Clappr !== 'undefined') {
+      setScriptLoaded(true);
+      return;
+    }
+
+    const handleLoad = () => setScriptLoaded(true);
+    const handleError = () => {
+      setError('Failed to load player script.');
+      setIsLoading(false);
+    };
+
+    let script = document.querySelector<HTMLScriptElement>('script[data-clappr-player="true"]');
+
+    if (!script) {
+      script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/@clappr/player@latest/dist/clappr.min.js';
+      script.async = true;
+      script.crossOrigin = 'anonymous';
+      script.dataset.clapprPlayer = 'true';
+      document.head.appendChild(script);
+    }
+
+    script.addEventListener('load', handleLoad);
+    script.addEventListener('error', handleError);
+
+    if (typeof window.Clappr !== 'undefined') {
+      setScriptLoaded(true);
+    }
+
+    return () => {
+      script?.removeEventListener('load', handleLoad);
+      script?.removeEventListener('error', handleError);
+    };
   }, []);
 
   const applyVideoStretch = useCallback((container: HTMLElement) => {
@@ -124,17 +150,17 @@ export const ClapprProxyPlayer = ({
             enableWorker: true,
             lowLatencyMode: false,
             debug: false,
-            liveSyncDurationCount: 7,
-            liveMaxLatencyDurationCount: 12,
+              liveSyncDurationCount: 3,
+              liveMaxLatencyDurationCount: 6,
             maxLiveSyncPlaybackRate: 1.5,
-            maxBufferLength: 60,
-            maxMaxBufferLength: 120,
+              maxBufferLength: 20,
+              maxMaxBufferLength: 40,
             maxBufferSize: 60 * 1000 * 1000,
             fragLoadingRetryDelay: 1000,
             fragLoadingMaxRetry: 10,
-            manifestLoadingRetryDelay: 1000,
+              manifestLoadingRetryDelay: 600,
             manifestLoadingMaxRetry: 10,
-            levelLoadingRetryDelay: 1000,
+              levelLoadingRetryDelay: 600,
             levelLoadingMaxRetry: 10,
             xhrSetup: (xhr: XMLHttpRequest) => { xhr.withCredentials = false; },
           },
@@ -247,9 +273,16 @@ export const ClapprProxyPlayer = ({
           playerContainerRef.current = el;
           if (el) el.id = containerId;
         }}
-        className={`w-full h-full ${isLoading ? 'opacity-0' : ''}`}
+        className="w-full h-full"
         style={{ position: 'relative' }}
       />
+
+      {isLoading && !error && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/75 backdrop-blur-sm z-40">
+          <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+          <p className="text-sm text-white/70">Connecting to live stream...</p>
+        </div>
+      )}
 
       {!error && (
         <img

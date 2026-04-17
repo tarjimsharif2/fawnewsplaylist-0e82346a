@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Tv, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { resolveStreamUrl } from '@/lib/stream';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -16,6 +17,7 @@ export default function Index() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pendingMatchId, setPendingMatchId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -62,12 +64,22 @@ export default function Index() {
     return slugMap;
   };
 
-  const slugMap = generateUniqueSlugs(matches);
+  const slugMap = useMemo(() => generateUniqueSlugs(matches), [matches]);
 
-  const handleMatchClick = (match: Match) => {
+  const handleMatchClick = useCallback(async (match: Match) => {
     const slug = slugMap[match.id];
-    navigate(`/match/${slug}`, { state: { matchUrl: match.url } });
-  };
+    setPendingMatchId(match.id);
+    setError(null);
+
+    try {
+      const streamUrl = await resolveStreamUrl(match.url);
+      navigate(`/match/${slug}`, { state: { matchUrl: match.url, streamUrl } });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to open stream');
+    } finally {
+      setPendingMatchId(null);
+    }
+  }, [navigate, slugMap]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -128,9 +140,15 @@ export default function Index() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {matches.map((match) => (
+                  (() => {
+                    const isPending = pendingMatchId === match.id;
+
+                    return (
                   <button
                     key={match.id}
                     onClick={() => handleMatchClick(match)}
+                    disabled={isPending}
+                    aria-busy={isPending}
                     className="bg-card rounded-xl overflow-hidden border border-border relative cursor-pointer hover:border-primary/50 transition-colors group flex flex-col text-left"
                   >
                     <div className="relative aspect-video bg-background">
@@ -148,6 +166,14 @@ export default function Index() {
                           PREVIEW STREAM
                         </div>
                       )}
+                      {isPending && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-10">
+                          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                            Opening stream...
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div className="p-3">
                       <p className="text-xs text-primary font-medium mb-1">
@@ -163,6 +189,8 @@ export default function Index() {
                       </div>
                     </div>
                   </button>
+                    );
+                  })()
                 ))}
               </div>
             )}
