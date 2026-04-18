@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Tv, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Play, Tv, Loader2, AlertCircle, RefreshCw, Search, MoreHorizontal } from 'lucide-react';
 import { resolveStreamUrl } from '@/lib/stream';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -13,11 +13,19 @@ interface Match {
   image?: string;
 }
 
+function splitLeagueTime(raw?: string): { league: string; time: string } {
+  if (!raw) return { league: '', time: '' };
+  const m = raw.match(/^(.*?)(\d{1,2}:\d{2})\s*$/);
+  if (m) return { league: m[1].trim(), time: m[2].trim() };
+  return { league: raw.trim(), time: '' };
+}
+
 export default function Index() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pendingMatchId, setPendingMatchId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -48,7 +56,7 @@ export default function Index() {
       .replace(/-+/g, '-')
       .substring(0, 60);
 
-  const generateUniqueSlugs = (matches: Match[]) => {
+  const slugMap = useMemo(() => {
     const slugCount: Record<string, number> = {};
     const slugMap: Record<string, string> = {};
     matches.forEach((match) => {
@@ -62,9 +70,17 @@ export default function Index() {
       slugMap[match.id] = slug;
     });
     return slugMap;
-  };
+  }, [matches]);
 
-  const slugMap = useMemo(() => generateUniqueSlugs(matches), [matches]);
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return matches;
+    return matches.filter(
+      (m) =>
+        m.name.toLowerCase().includes(q) ||
+        (m.time || '').toLowerCase().includes(q)
+    );
+  }, [matches, query]);
 
   const handleMatchClick = useCallback(async (match: Match) => {
     const slug = slugMap[match.id];
@@ -84,138 +100,135 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-background">
       <div className="flex flex-col md:flex-row min-h-screen">
-          {/* Sidebar */}
-          <aside className="hidden md:flex flex-col w-64 border-r border-border p-6">
-            <div className="flex items-center gap-2 mb-8">
-              <Tv className="w-6 h-6 text-primary" />
-              <span className="text-lg font-bold tracking-tight">ePlayHD</span>
+        {/* Sidebar */}
+        <aside className="hidden md:flex flex-col w-64 border-r border-border p-6">
+          <div className="flex items-center gap-2 mb-8">
+            <Tv className="w-6 h-6 text-primary" />
+            <span className="text-lg font-bold tracking-tight">ePlayHD</span>
+          </div>
+          <nav className="space-y-1">
+            <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-card text-foreground">
+              <Play className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">Live Matches</span>
             </div>
-            <nav className="space-y-1">
-              <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-card text-foreground">
-                <Play className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium">Live Matches</span>
-              </div>
-            </nav>
-          </aside>
+          </nav>
+        </aside>
 
-          {/* Main Content */}
-          <main className="flex-1 p-4 md:p-8">
-            {/* Mobile Header */}
-            <div className="md:hidden flex items-center gap-2 mb-6">
-              <Tv className="w-6 h-6 text-primary" />
-              <span className="text-lg font-bold tracking-tight">ePlayHD</span>
+        {/* Main Content */}
+        <main className="flex-1 p-4 md:p-8">
+          {/* Mobile Header */}
+          <div className="md:hidden flex items-center gap-2 mb-4">
+            <Tv className="w-6 h-6 text-primary" />
+            <span className="text-lg font-bold tracking-tight">ePlayHD</span>
+          </div>
+
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-xl md:text-2xl font-bold">Live Now</h1>
+            <button
+              onClick={fetchMatches}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="relative mb-4">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search matches or league..."
+              className="w-full bg-card border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
+            />
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
-
-            <div className="flex items-center justify-between mb-6">
-              <h1 className="text-2xl font-bold">Live Now</h1>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <AlertCircle className="w-8 h-8 text-primary" />
+              <p className="text-muted-foreground">{error}</p>
               <button
                 onClick={fetchMatches}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="text-sm text-primary hover:underline"
               >
-                <RefreshCw className="w-4 h-4" />
-                Refresh
+                Try again
               </button>
             </div>
-
-            {loading ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              </div>
-            ) : error ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <AlertCircle className="w-8 h-8 text-primary" />
-                <p className="text-muted-foreground">{error}</p>
-                <button
-                  onClick={fetchMatches}
-                  className="text-sm text-primary hover:underline"
-                >
-                  Try again
-                </button>
-              </div>
-            ) : matches.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <Tv className="w-8 h-8 text-muted-foreground" />
-                <p className="text-muted-foreground">No matches found at the moment.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {matches.map((match) => (
-                  (() => {
-                    const isPending = pendingMatchId === match.id;
-
-                    return (
-                  <button
-                    key={match.id}
-                    onClick={() => handleMatchClick(match)}
-                    disabled={isPending}
-                    aria-busy={isPending}
-                    className="bg-card rounded-xl overflow-hidden border border-border relative cursor-pointer hover:border-primary/50 transition-colors group flex flex-col text-left"
-                  >
-                    <div className="relative aspect-video bg-background">
-                      <span className="absolute top-2 left-2 bg-primary text-white text-xs font-bold px-2 py-0.5 rounded z-10">
-                        Live
-                      </span>
-                      {match.image ? (
-                        <img
-                          src={match.image}
-                          alt={match.name}
-                          className="w-full h-full object-cover"
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <Tv className="w-8 h-8 text-muted-foreground" />
+              <p className="text-muted-foreground">
+                {matches.length === 0 ? 'No matches found at the moment.' : 'No matches match your search.'}
+              </p>
+            </div>
+          ) : (
+            <ul className="flex flex-col gap-2.5">
+              {filtered.map((match) => {
+                const isPending = pendingMatchId === match.id;
+                const { league, time } = splitLeagueTime(match.time);
+                return (
+                  <li key={match.id}>
+                    <button
+                      onClick={() => handleMatchClick(match)}
+                      disabled={isPending}
+                      aria-busy={isPending}
+                      className="w-full flex items-center gap-3 bg-card hover:bg-card/70 border border-border hover:border-primary/40 rounded-xl p-3 text-left transition-colors disabled:opacity-70"
+                    >
+                      <div className="relative shrink-0">
+                        <div className="w-12 h-12 rounded-full overflow-hidden bg-background flex items-center justify-center">
+                          {match.image ? (
+                            <img
+                              src={match.image}
+                              alt=""
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <Tv className="w-5 h-5 text-muted-foreground" />
+                          )}
+                        </div>
+                        <span
+                          className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-primary border-2 border-card"
+                          aria-label="Live"
                         />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
-                          PREVIEW STREAM
-                        </div>
-                      )}
-                      {isPending && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-10">
-                          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                            <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                            Opening stream...
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-3">
-                      <p className="text-xs text-primary font-medium mb-1">
-                        {match.time ? match.time : 'Live Event'}
-                      </p>
-                      <p className="text-sm font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
-                        {match.name}
-                      </p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Play className="w-3 h-3" /> Watch
-                        </span>
                       </div>
-                    </div>
-                  </button>
-                    );
-                  })()
-                ))}
-              </div>
-            )}
 
-            {!loading && matches.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-8 text-center">
-                <div className="bg-card rounded-lg p-3 border border-border">
-                  <p className="text-xs text-muted-foreground">Detected Links</p>
-                  <p className="text-sm font-bold text-primary">{matches.length} Active</p>
-                </div>
-                <div className="bg-card rounded-lg p-3 border border-border">
-                  <p className="text-xs text-muted-foreground">Server Latency</p>
-                  <p className="text-sm font-bold text-foreground">14ms</p>
-                </div>
-                <div className="bg-card rounded-lg p-3 border border-border">
-                  <p className="text-xs text-muted-foreground">Scrape Frequency</p>
-                  <p className="text-sm font-bold text-foreground">Every 30s</p>
-                </div>
-                <div className="bg-card rounded-lg p-3 border border-border">
-                  <p className="text-xs text-muted-foreground">Global Watchers</p>
-                  <p className="text-sm font-bold text-foreground">1.2M Online</p>
-                </div>
-              </div>
-            )}
-          </main>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">
+                          {match.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {league}
+                          {time && <span className="ml-1 text-foreground/80">{time}</span>}
+                        </p>
+                      </div>
+
+                      <div className="shrink-0 text-muted-foreground">
+                        {isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                        ) : (
+                          <MoreHorizontal className="w-5 h-5" />
+                        )}
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {!loading && matches.length > 0 && (
+            <p className="mt-6 text-center text-xs text-muted-foreground">
+              Showing {filtered.length} of {matches.length} matches
+            </p>
+          )}
+        </main>
       </div>
     </div>
   );
