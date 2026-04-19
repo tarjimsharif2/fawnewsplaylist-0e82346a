@@ -42,6 +42,46 @@ function checkReferer(req: Request): Response | null {
   return null;
 }
 
+const FETCH_RETRY_DELAYS_MS = [0, 500, 1200] as const;
+const FETCH_TIMEOUT_MS = 8000;
+
+async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+  let lastError: Error | null = null;
+
+  for (const delay of FETCH_RETRY_DELAYS_MS) {
+    if (delay > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url, { ...init, signal: controller.signal });
+
+      if (response.ok || response.status < 500) {
+        return response;
+      }
+
+      lastError = new Error(`Upstream responded with ${response.status}`);
+
+      if (delay === FETCH_RETRY_DELAYS_MS[FETCH_RETRY_DELAYS_MS.length - 1]) {
+        return response;
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("Proxy fetch failed");
+
+      if (delay === FETCH_RETRY_DELAYS_MS[FETCH_RETRY_DELAYS_MS.length - 1]) {
+        throw lastError;
+      }
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  throw lastError ?? new Error("Proxy fetch failed");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -61,7 +101,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const response = await fetch(url, {
+    const response = await fetchWithRetry(url, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",

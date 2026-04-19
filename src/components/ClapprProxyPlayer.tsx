@@ -16,6 +16,7 @@ interface ClapprProxyPlayerProps {
 }
 
 const LOGO_URL = 'https://i.ibb.co/Q3rp8ZXs/20260203-180035-0000.png';
+const MAX_AUTO_RECOVERY_ATTEMPTS = 3;
 
 export const ClapprProxyPlayer = ({
   streamUrl,
@@ -33,6 +34,8 @@ export const ClapprProxyPlayer = ({
   const [isPaused, setIsPaused] = useState(false);
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const userPausedRef = useRef(false);
+  const recoveryAttemptsRef = useRef(0);
+  const retryTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -118,6 +121,11 @@ export const ClapprProxyPlayer = ({
   const initPlayer = useCallback(() => {
     if (!playerContainerRef.current || typeof window.Clappr === 'undefined') return;
 
+    if (retryTimerRef.current) {
+      window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+
     if (playerRef.current) { playerRef.current.destroy(); playerRef.current = null; }
 
     const container = playerContainerRef.current;
@@ -167,6 +175,7 @@ export const ClapprProxyPlayer = ({
         },
         events: {
           onReady: () => {
+            recoveryAttemptsRef.current = 0;
             setIsLoading(false);
             setError(null);
             onReady?.();
@@ -175,6 +184,7 @@ export const ClapprProxyPlayer = ({
             setTimeout(() => { try { player.play(); } catch {} }, 200);
           },
           onPlay: () => {
+            recoveryAttemptsRef.current = 0;
             setIsLoading(false);
             setError(null);
             setIsPaused(false);
@@ -192,12 +202,23 @@ export const ClapprProxyPlayer = ({
           },
           onError: (err: any) => {
             console.error('ClapprProxy Error:', err);
-            const errMsg = 'Playback failed. The stream might be restricted or the proxy is being blocked.';
+            if (recoveryAttemptsRef.current < MAX_AUTO_RECOVERY_ATTEMPTS) {
+              recoveryAttemptsRef.current += 1;
+              setError(null);
+              setIsPaused(false);
+              setIsLoading(true);
+              retryTimerRef.current = window.setTimeout(() => {
+                retryTimerRef.current = null;
+                initPlayer();
+              }, 1200 * recoveryAttemptsRef.current);
+              return;
+            }
+
+            const errMsg = 'Stream reconnect failed. Please tap retry.';
             setError(errMsg);
             setIsLoading(false);
             setIsPaused(false);
             onError?.(errMsg);
-            if (err?.code === 'PLAYBACK_ERROR') setTimeout(() => initPlayer(), 3000);
             onStuck?.();
           },
         },
@@ -235,6 +256,10 @@ export const ClapprProxyPlayer = ({
   useEffect(() => {
     if (scriptLoaded) initPlayer();
     return () => {
+      if (retryTimerRef.current) {
+        window.clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
       if (playerRef.current) { playerRef.current.destroy(); playerRef.current = null; }
     };
   }, [scriptLoaded, initPlayer]);
