@@ -20,7 +20,7 @@ interface MatchItem {
 }
 
 // In-memory cache (per edge instance)
-let cache: { ts: number; data: MatchItem[] } | null = null;
+const cacheByOrigin = new Map<string, { ts: number; data: MatchItem[] }>();
 const CACHE_TTL_MS = 60 * 1000; // 60s
 
 function splitLeagueTime(raw?: string): { league: string; time: string } {
@@ -198,12 +198,13 @@ Deno.serve(async (req) => {
     origin = origin.replace(/\/$/, "");
     const noCache = url.searchParams.get("nocache") === "1";
 
+    const cached = cacheByOrigin.get(origin);
     let data: MatchItem[];
-    if (!noCache && cache && Date.now() - cache.ts < CACHE_TTL_MS) {
-      data = cache.data;
+    if (!noCache && cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+      data = cached.data;
     } else {
       data = await buildMatchList(origin);
-      cache = { ts: Date.now(), data };
+      cacheByOrigin.set(origin, { ts: Date.now(), data });
     }
 
     const body = JSON.stringify(
