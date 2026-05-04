@@ -1,5 +1,9 @@
 {
   "rewrites": [
+    {
+      "source": "/api/match.json",
+      "destination": "https://pvupixvgqwqaoauyidur.supabase.co/functions/v1/match-json"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
