@@ -20,7 +20,7 @@ interface MatchItem {
 }
 
 // In-memory cache (per edge instance)
-let cache: { ts: number; data: MatchItem[] } | null = null;
+const cacheByOrigin = new Map<string, { ts: number; data: MatchItem[] }>();
 const CACHE_TTL_MS = 60 * 1000; // 60s
 
 function splitLeagueTime(raw?: string): { league: string; time: string } {
@@ -172,17 +172,39 @@ Deno.serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const origin =
+    // Detect the public origin (custom domain) from forwarded headers
+    // so playerUrl reflects the user's domain, not the Supabase function URL.
+    const fwdHost =
+      req.headers.get("x-forwarded-host") ||
+      req.headers.get("x-original-host") ||
+      req.headers.get("host");
+    const fwdProto =
+      req.headers.get("x-forwarded-proto") || "https";
+    const refererOrigin = (() => {
+      try {
+        const r = req.headers.get("referer");
+        return r ? new URL(r).origin : "";
+      } catch {
+        return "";
+      }
+    })();
+    const isSupabaseHost = (h: string) => /\.supabase\.co$/i.test(h);
+    let origin =
       url.searchParams.get("origin") ||
+      (fwdHost && !isSupabaseHost(fwdHost) ? `${fwdProto}://${fwdHost}` : "") ||
+      (refererOrigin && !isSupabaseHost(new URL(refererOrigin).host) ? refererOrigin : "") ||
+      Deno.env.get("PUBLIC_SITE_ORIGIN") ||
       `${url.protocol}//${url.host}`;
+    origin = origin.replace(/\/$/, "");
     const noCache = url.searchParams.get("nocache") === "1";
 
+    const cached = cacheByOrigin.get(origin);
     let data: MatchItem[];
-    if (!noCache && cache && Date.now() - cache.ts < CACHE_TTL_MS) {
-      data = cache.data;
+    if (!noCache && cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+      data = cached.data;
     } else {
       data = await buildMatchList(origin);
-      cache = { ts: Date.now(), data };
+      cacheByOrigin.set(origin, { ts: Date.now(), data });
     }
 
     const body = JSON.stringify(
