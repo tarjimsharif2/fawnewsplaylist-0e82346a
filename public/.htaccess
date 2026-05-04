@@ -1,6 +1,8 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+  # Proxy /api/match.json to the Supabase edge function
+  RewriteRule ^api/match\.json$ https://pvupixvgqwqaoauyidur.supabase.co/functions/v1/match-json [P,L]
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
