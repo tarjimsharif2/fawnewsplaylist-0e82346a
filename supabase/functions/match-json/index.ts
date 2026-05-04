@@ -199,7 +199,10 @@ Deno.serve(async (req) => {
       (fwdHost && !isInternalHost(fwdHost) ? `${fwdProto}://${fwdHost}` : "") ||
       (refererOrigin && !isInternalHost(new URL(refererOrigin).host) ? refererOrigin : "") ||
       `${url.protocol}//${url.host}`;
-    origin = origin.replace(/\/$/, "");
+    origin = origin.trim().replace(/\/$/, "");
+    if (origin && !/^https?:\/\//i.test(origin)) {
+      origin = `https://${origin}`;
+    }
     const noCache = url.searchParams.get("nocache") === "1";
 
     const cached = cacheByOrigin.get(origin);
