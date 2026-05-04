@@ -188,12 +188,16 @@ Deno.serve(async (req) => {
         return "";
       }
     })();
-    const isSupabaseHost = (h: string) => /\.supabase\.co$/i.test(h);
+    const isInternalHost = (h: string) =>
+      /\.supabase\.co$/i.test(h) ||
+      /\.supabase\.com$/i.test(h) ||
+      /edge-runtime/i.test(h) ||
+      /^localhost(:|$)/i.test(h);
     let origin =
       url.searchParams.get("origin") ||
-      (fwdHost && !isSupabaseHost(fwdHost) ? `${fwdProto}://${fwdHost}` : "") ||
-      (refererOrigin && !isSupabaseHost(new URL(refererOrigin).host) ? refererOrigin : "") ||
       Deno.env.get("PUBLIC_SITE_ORIGIN") ||
+      (fwdHost && !isInternalHost(fwdHost) ? `${fwdProto}://${fwdHost}` : "") ||
+      (refererOrigin && !isInternalHost(new URL(refererOrigin).host) ? refererOrigin : "") ||
       `${url.protocol}//${url.host}`;
     origin = origin.replace(/\/$/, "");
     const noCache = url.searchParams.get("nocache") === "1";
